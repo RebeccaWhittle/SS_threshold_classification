@@ -68,9 +68,28 @@ SS_spec = (spec * (1-spec)) / (se**2 * (1-outcome_prop))
 SS_sens = (sens * (1-sens)) / (outcome_prop * se**2)
 SS_ppv = ((ppv**2) * (1-ppv)) / (se**2 * outcome_prop * sens)
 SS_npv = (npv * (1-npv)) / (se**2 * (spec * (1-outcome_prop) + outcome_prop * (1-sens)))
-cov_1 = (precision * (1-precision) * (1-recall)) / outcome_prop
-cov_2 = (precision * spec * (1-precision)) / (1-outcome_prop)
-SS_f1 = (2 * (precision**2) * (recall**2) * (cov_1 + cov_2)) / ((((se**2) * ((precision + recall)**4)) / 4) - ((precision**4) * (se**2)) - ((recall**4) * (se**2)))
+
+# SS for F1 score
+np.random.seed(1234)
+df_iter = pd.DataFrame({'size': range(1, 100001)})
+df_iter['se_precision'] = np.sqrt((precision*(1-precision))/(recall*df_iter['size']*outcome_prop/precision))
+df_iter['se_recall'] = np.sqrt((recall*(1-recall))/(df_iter['size']*outcome_prop))
+df_iter['cov_P_R']=(((precision*(1-precision)*(1-recall))/outcome_prop)+((precision*(1-precision)*spec)/(1-outcome_prop)))/df_iter['size']
+df_iter['se_F1'] = np.sqrt(4 * (recall**4*df_iter['se_precision']**2 + 2*precision**2*recall**2*df_iter['cov_P_R'] + precision**4*df_iter['se_recall']**2) / (precision+recall)**4)
+
+results = {}
+for m in ['precision', 'recall', 'F1']:
+    se_column = f'se_{m}'
+    filtered_df = df_iter[df_iter[se_column] <= 0.0255]
+    if not filtered_df.empty:
+        results[f'SS_{m}'] = filtered_df['size'].min()
+    else:
+        results[f'SS_{m}'] = None
+print(results)
+
+precision_result = results.get('SS_precision', float('-inf'))
+recall_result = results.get('SS_recall', float('-inf'))
+F1_result = results.get('SS_F1', float('-inf'))
 
 # print SS calculations:
 print("Minimum required sample size (events):")
@@ -79,8 +98,7 @@ print("Specificity: " + str(math.ceil(SS_spec)) + " (" + str(math.ceil(SS_spec*o
 print("Sensitvity/Recall: " + str(math.ceil(SS_sens)) + " (" + str(math.ceil(SS_sens*outcome_prop)) + ")")
 print("PPV/Precision: " + str(math.ceil(SS_ppv)) + " (" + str(math.ceil(SS_ppv*outcome_prop)) + ")")
 print("NPV: " + str(math.ceil(SS_npv)) + " (" + str(math.ceil(SS_npv*outcome_prop)) + ")")
-print("F1-Score: " + str(math.ceil(SS_f1)) + " (" + str(math.ceil(SS_f1*outcome_prop)) + ")")
-
+print("F1-Score: " + str(F1_result) + " (" + str(math.ceil(F1_result*outcome_prop)) + ")")
 
 
 ### Calculate precision (CIs) of performance measures using minimum SS from Riley criteria
